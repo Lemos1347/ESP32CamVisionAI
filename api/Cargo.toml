@@ -12,8 +12,19 @@ ort = { version = "1.16.3", default-features = false, features = ["load-dynamic"
 rusttype = { version = "0.9", default-features = false }
 anyhow = { version = "1.0.75" }
 regex = { version = "1.5.4" }
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 rand = { version = "0.8.5" }
 chrono = { version = "0.4.30" }
 half = { version = "2.3.1" }
 dirs = { version = "5.0.1" }
 ureq = { version = "2.9.1" }
+axum = { version = "0.7.6", features = ["ws"]}
+axum-extra = { version = "0.9.4" , features = ["typed-header"] }
+tower = "0.5.1"
+tower-http = { version = "0.5.0", features = ["fs", "trace"] }
+tokio = { version = "1.40.0", features = ["full"]}
+tokio-tungstenite = "0.23"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"]}
+tracing = "0.1.40"
+headers = "0.4.0"

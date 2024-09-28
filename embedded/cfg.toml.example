@@ -1,0 +1,6 @@
+[esp32cam-rs]
+wifi_ssid = "WifiName"
+wifi_psk = "WifiPassword"
+server_url = "http://127.0.0.0:8080"
+use_flash = true
+flash_brightness = 32
