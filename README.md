@@ -51,9 +51,10 @@ A visualização das imagens é feita através de uma página [HTML](./frontend)
 ## Como Executar
 
 > [!IMPORTANT]
-> Para esse projeto é necessario ter configurado em sua máquina: [Rust](https://www.rust-lang.org/) e [Golang](https://go.dev/).
-> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).
-> Para conseguir utilizar a API é crucial que o seu clang esteja devidamente configurado em seu dispositivo.
+> Para esse projeto é necessario ter configurado em sua máquina: [Rust](https://www.rust-lang.org/) e [Golang](https://go.dev/).  
+> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).  
+> Para conseguir utilizar a API é crucial que o seu clang esteja devidamente configurado em seu dispositivo.  
+> Para alterar as credenciais do wifi e qualquer outra configuração do esp32, crie um arquivo `cfg.toml` com os mesmo campos que em [cfg.toml.example](./embedded/cfg.toml.example)  
 
 Após toda a configuração inicial, para rodar tanto o embarcado quando a api há Justfiles.
 
