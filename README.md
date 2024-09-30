@@ -8,6 +8,8 @@ A solução é dividida em duas partes principais: o ESP32-CAM responsável pela
 
 ## Funcionamento
 
+https://github.com/user-attachments/assets/fcf8186e-c147-4547-802e-977a5c97fd40
+
 1. O ESP32-CAM captura imagens em tempo real.
 2. As imagens são enviadas para um servidor remoto para processamento.
 3. O servidor processa as imagens utilizando um algoritmo de detecção de faces.
@@ -61,5 +63,5 @@ just app
 ```
 *Embarcado*
 ```bash
-just compile
+just esp32cam
 ```
