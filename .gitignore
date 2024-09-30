@@ -16,7 +16,6 @@ Cargo.lock
 *.pdb
 
 *.DS_Store
-*.onnx
 *.ttf
 
 cfg.toml

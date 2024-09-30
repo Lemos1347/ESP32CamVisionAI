@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Streaming de Imagens via SSE</title>
+  </head>
+  <body>
+    <h1>Streaming de Imagens</h1>
+    <img id="streaming-video" alt="Streaming de vídeo" style="width: 600px" />
+
+    <script>
+      // Criar uma conexão com o servidor via SSE (note o endereço do servidor)
+      const eventSource = new EventSource("http://localhost:8080/stream");
+      let imgElement = document.getElementById("streaming-video");
+
+      eventSource.onmessage = function (event) {
+        // Quando o servidor envia uma nova imagem (em base64), atualiza a imagem no <img>
+        console.log(event.data);
+        imgElement.src = "data:" + event.data;
+      };
+
+      eventSource.onerror = function (error) {
+        console.error("Erro na conexão SSE:", error);
+      };
+    </script>
+  </body>
+</html>

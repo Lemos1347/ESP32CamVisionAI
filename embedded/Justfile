@@ -1,0 +1,10 @@
+[private]
+default:
+  @just --list
+
+compile:
+  @cargo build --release
+  espflash flash ./target/xtensa-esp32-espidf/release/esp32cam-rs
+
+dev:
+  @cargo run

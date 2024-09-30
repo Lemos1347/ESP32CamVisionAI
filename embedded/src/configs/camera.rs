@@ -289,7 +289,7 @@ impl<'a> Camera<'a> {
             frame_size: camera::framesize_t_FRAMESIZE_UXGA,
 
             jpeg_quality: 15,
-            fb_count: 5,
+            fb_count: 2,
             grab_mode: camera::camera_grab_mode_t_CAMERA_GRAB_LATEST,
             ..Default::default()
         };
