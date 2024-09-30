@@ -42,7 +42,7 @@ pub extern "C" fn load_model(
     let model = match YOLOv8::new(YOLOv8Config {
         model_path,
         conf: 0.55,
-        profile: true,
+        profile: false,
         plot: true,
         save_dir: Some(dir.to_string()),
     }) {

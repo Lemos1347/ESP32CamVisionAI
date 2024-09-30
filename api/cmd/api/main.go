@@ -74,8 +74,10 @@ func (ib *ImageBuffer) Add(imagePath *string) {
 	select {
 	case ib.ch <- image:
 		// Success to send to chn
+		log.Println("Image sent to channel")
 	default:
 		// Chn is full, descart the oldest photo
+		log.Println("Channel is full")
 	}
 }
 
