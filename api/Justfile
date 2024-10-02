@@ -3,16 +3,12 @@ default:
   @just --list
 
 compile:
-  #!/bin/bash
-  cd ./cmd/yolo_rs ; cargo build --release
-  cd ./../../ ; pwd
-  go build ./cmd/api
+  @cd ./cmd/api/lib/yolo_rs ; cargo build --release
+  @go build ./cmd/api
 
 run: compile
   ./api
 
 dev:
-  #!/bin/bash
-  cd ./cmd/yolo_rs ; cargo build --release
-  cd ./../../ ; pwd
+  @cd ./cmd/api/lib/yolo_rs ; cargo build --release
   go run ./cmd/api
