@@ -202,14 +202,14 @@ git clone --recurse-submodules https://github.com/Lemos1347/inteli-modulo-11-pon
 ```
 
 > [!IMPORTANT]
-> Para rodar esse projeto é obrigatório a instalação de [Just](https://github.com/casey/just) e [Docker](https://www.docker.com/) em sua máquina!
+> Para rodar esse projeto é obrigatório a instalação de [Just](https://github.com/casey/just) e [Docker](https://www.docker.com/) em sua máquina!  
 > Para rodar o código embarcado é obrigatório ter em sua máquina [Rust](https://www.rust-lang.org/), ter configurado o [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera) baixada (já está sendo incuída caso você tenha clonado o repo com os submodules).
 
 > [!NOTE]
-> A seguir estão as dependências de desenvolvimento desse projeto:
-> Para esse projeto é necessario ter configurado em sua máquina: [Rust](https://www.rust-lang.org/) e [Golang](https://go.dev/).  
-> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).
-> É obrigatório seguir as instruções da crate [ort](https://docs.rs/ort/latest/ort/#shared-library-hell) e ter um [onnxruntime](https://github.com/microsoft/onnxruntime/releases) instalado em sua máquina.  
+> A seguir estão as dependências de desenvolvimento desse projeto:  
+> Para esse projeto é necessario ter configurado em sua máquina: [Rust](https://www.rust-lang.org/) e [Golang](https://go.dev/).   
+> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).  
+> É obrigatório seguir as instruções da crate [ort](https://docs.rs/ort/latest/ort/#shared-library-hell) e ter um [onnxruntime](https://github.com/microsoft/onnxruntime/releases) instalado em sua máquina.   
 > Para conseguir utilizar a API para dev é crucial que o seu clang esteja devidamente configurado em seu dispositivo.  
 > Para alterar as credenciais do wifi e qualquer outra configuração do esp32, crie um arquivo `cfg.toml` com os mesmo campos que em [cfg.toml.example](./embedded/cfg.toml.example)
 
