@@ -118,78 +118,56 @@ Dentro da pasta [api](./api) está o seu código, o qual está organizado da seg
 
 - **Desempenho**: Chamar código nativo otimizado em Rust a partir de Go pode melhorar significativamente o desempenho para tarefas específicas. Além disso, como a biblioteca Rust é incorporada diretamente ao binário final durante o processo de compilação, não há gargalo de performance associado às chamadas de funções externas. Isso significa que o processamento ocorre de forma eficiente, sem overhead adicional, garantindo rapidez na detecção de faces.
 
-#### 2.4 Linkagem Estática e Sua Importância
+#### 2.4 Linkagem Dinâmica e Sua Importância
 
-**O que é Linkagem Estática**:
+**O que é Linkagem Dinâmica**:
 
-- **Linkagem Estática**: Processo de incorporação de todas as bibliotecas e dependências diretamente no executável durante a compilação. O resultado é um binário autossuficiente.
+- **Linkagem Dinâmica**: As bibliotecas são carregadas em tempo de execução. O executável depende da presença das bibliotecas corretas no sistema, utilizando mecanismos como `dlopen` para carregar dependências.
 
-- **Linkagem Dinâmica**: As bibliotecas são vinculadas em tempo de execução. O executável depende da presença das bibliotecas corretas no sistema onde é executado.
+- **Linkagem Estática**: As bibliotecas são incorporadas diretamente no executável durante a compilação, resultando em um binário autossuficiente.
 
-**Por que a Linkagem Estática é Importante neste Projeto**:
+**Por que a Linkagem Dinâmica é Necessária neste Projeto**:
 
-- **Portabilidade**:
+- **Uso da Crate `ort` em Rust**:
 
-  - Garante que o binário possa ser executado em diferentes ambientes sem necessidade de instalar dependências adicionais.
-  - Facilita a distribuição e implantação da aplicação, especialmente em contêineres Docker ou sistemas embarcados.
+  - A biblioteca `ort` usada para inferência com ONNX Runtime recomenda o uso da feature `load-dyn`, que carrega o runtime dinamicamente via `dlopen`. Isso torna a linkagem dinâmica obrigatória.
 
-- **Simplificação do Deploy**:
+- **Flexibilidade**:
 
-  - Elimina problemas relacionados a versões incompatíveis de bibliotecas ou ausência de dependências no ambiente de produção.
-  - Reduz a complexidade do ambiente de execução, pois não depende de bibliotecas externas.
-
-- **Integração Go e Rust**:
-
-  - Assegura que a biblioteca estática do Rust esteja corretamente incluída no binário Go.
-  - Evita problemas de linkagem dinâmica que podem ocorrer devido a incompatibilidades entre diferentes sistemas ou configurações.
+  - Permite que o ONNX Runtime seja atualizado ou substituído sem a necessidade de recompilar o binário.
+  - Facilita o uso de diferentes versões do runtime em diversos ambientes.
 
 **Diferenças entre Linkagem Estática e Dinâmica**:
 
 - **Linkagem Estática**:
 
   - **Vantagens**:
-    - Executável independente.
-    - Maior controle sobre o ambiente de execução.
-    - Elimina dependências externas em tempo de execução.
+    - Binário autossuficiente.
+    - Controle completo do ambiente de execução.
   - **Desvantagens**:
-    - Tamanho maior do executável.
-    - Menos flexibilidade para atualizar bibliotecas sem recompilar.
+    - Tamanho maior do binário.
+    - Não compatível com a feature `load-dyn` da crate `ort`.
 
 - **Linkagem Dinâmica**:
 
   - **Vantagens**:
-    - Executáveis menores.
-    - Possibilidade de atualizar bibliotecas sem recompilar o executável.
+    - Binários menores.
+    - Atualização de bibliotecas sem recompilação.
+    - Necessária para o carregamento dinâmico do ONNX Runtime.
   - **Desvantagens**:
     - Dependência de bibliotecas externas em tempo de execução.
-    - Possibilidade de conflitos de versão ou ausência de bibliotecas necessárias.
 
-##### 2.4.1 Importante: Considerações sobre a Linkagem Estática no macOS
+##### 2.4.1 Considerações sobre a Linkagem Dinâmica
 
-É fundamental destacar que a flag `-static` não é incluída diretamente nas diretivas do CGO (`#cgo LDFLAGS`) no arquivo Go. Em vez disso, a linkagem estática é aplicada durante o processo de compilação no Dockerfile, por meio do comando de build. Isso ocorre devido a uma limitação conhecida no macOS, que não disponibiliza uma versão estática da biblioteca `libSystem.dylib`, essencial para a linkagem estática completa.
+A utilização da feature `load-dyn` da crate `ort` exige a linkagem dinâmica para o ONNX Runtime, o que traz flexibilidade, mas requer que o ambiente de execução tenha as bibliotecas corretas disponíveis.
 
-Conforme explicado por um usuário no stackoverflow:
-
-> _"Você pode compilar `crt0.o` via Csu (abreviação de 'C start up'), mas infelizmente esse `crt0.o` é incapaz de linkar com `libc`, já que não há uma versão estática de `libSystem.dylib`. Portanto, não é suportado até que a Apple nos forneça uma versão estática de `libSystem.dylib`. Ou isso, ou não usar `libc`. Há mais detalhes neste ticket do Github para Csu."_
-
-Além disso, a documentação do `gcc` reforça essa limitação:
-
-> \*"-static  
-> Em sistemas que suportam linkagem dinâmica, isso previne a linkagem com as bibliotecas compartilhadas. Em outros sistemas, esta opção não tem efeito.
->
-> Esta opção não funcionará no macOS a menos que todas as bibliotecas (incluindo `libgcc.a`) também tenham sido compiladas com `-static`. Como nem uma versão estática de `libSystem.dylib` nem `crt0.o` são fornecidos, esta opção não é útil para a maioria das pessoas."\*
+- **Portabilidade via Docker**: A portabilidade pode ser garantida com o uso de contêineres Docker ou ambientes controlados, assegurando que as bibliotecas necessárias estejam presentes.
+- **Facilidade de Atualização**: As bibliotecas podem ser atualizadas ou substituídas independentemente do binário, sem a necessidade de recompilação.
 
 **Por que isso é relevante para o projeto?**
 
-- **Limitações do macOS**: Devido à ausência de uma versão estática da `libSystem.dylib` no macOS, tentar realizar a linkagem estática diretamente nas flags do CGO resultaria em erros de compilação ou em um binário incompatível.
-- **Solução via Docker**: Ao executar o processo de build dentro de um contêiner Docker com um sistema operacional que suporta a linkagem estática completa (como Alpine Linux ou outras distribuições Linux), é possível incluir a flag `-static` durante a compilação, garantindo que o binário resultante seja autossuficiente e portátil.
-- **Portabilidade**: Compilar o binário com linkagem estática em um ambiente controlado assegura que ele possa ser executado em diferentes sistemas, sem depender das bibliotecas dinâmicas do sistema host.
-
-**Referências:**
-
-- [How to static link on OS X](https://stackoverflow.com/questions/844819/how-to-static-link-on-os-x)
-- [Issue regarding static linking in Csu-85](https://github.com/skaht/Csu-85/issues/2)
-- [Creating static Mac OS X C++ build](https://stackoverflow.com/questions/5259249/creating-static-mac-os-x-c-build)
+- **Necessidade da Crate `ort`**: O uso da feature `load-dyn` torna obrigatória a linkagem dinâmica.
+- **Portabilidade**: A utilização de ambientes controlados, como contêineres, garante a portabilidade mesmo com linkagem dinâmica.
 
 #### 2.5 Resumo do Processo em Nível de Aplicação
 
@@ -203,15 +181,13 @@ Além disso, a documentação do `gcc` reforça essa limitação:
    - O Go é instruído a linkar a biblioteca estática do Rust utilizando as diretivas de compilação no cabeçalho do arquivo Go.
    - O cabeçalho C (`bindings.h`) é incluído para que o Go conheça as assinaturas das funções.
 
-3. **Compilação com Linkagem Estática**:
+3. **Compilação com Linkagem Dinâmica**:
 
-   - Durante a compilação, todas as dependências (incluindo a biblioteca Rust) são incorporadas no binário final.
-   - A flag `-static` é utilizada para garantir a linkagem estática.
+   - As dependências, como o ONNX Runtime, são carregadas em tempo de execução, em vez de estarem incorporadas no binário.
 
 4. **Execução da Aplicação**:
 
-   - O binário resultante pode ser executado em qualquer ambiente compatível sem necessidade de bibliotecas adicionais.
-   - O servidor Go inicia, carrega o modelo de detecção de faces e começa a processar as imagens recebidas.
+   - O binário requer que o ONNX Runtime esteja disponível no ambiente de execução. O servidor Go inicia, carrega o modelo de detecção de faces e começa a processar as imagens recebidas.
 
 ### 3. Frontend: Visualização das Imagens
 
@@ -219,10 +195,22 @@ A visualização das imagens é feita através de uma página [HTML](./frontend)
 
 ## Como Executar
 
+Clone o projeto incluindo os submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/Lemos1347/inteli-modulo-11-ponderada-2.git
+```
+
 > [!IMPORTANT]
+> Para rodar esse projeto é obrigatório a instalação de [Just](https://github.com/casey/just) e [Docker](https://www.docker.com/) em sua máquina!
+> Para rodar o código embarcado é obrigatório ter em sua máquina [Rust](https://www.rust-lang.org/), ter configurado o [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera) baixada (já está sendo incuída caso você tenha clonado o repo com os submodules).
+
+> [!NOTE]
+> A seguir estão as dependências de desenvolvimento desse projeto:
 > Para esse projeto é necessario ter configurado em sua máquina: [Rust](https://www.rust-lang.org/) e [Golang](https://go.dev/).  
-> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).  
-> Para conseguir utilizar a API é crucial que o seu clang esteja devidamente configurado em seu dispositivo.  
+> Para conseguir utilizar o pacote do embarcado, é necessário seguir as instruções do [rust hal para esp32](https://docs.esp-rs.org/book/introduction.html) e também baixar a biblioteca [esp32-camera](https://github.com/espressif/esp32-camera).
+> É obrigatório seguir as instruções da crate [ort](https://docs.rs/ort/latest/ort/#shared-library-hell) e ter um [onnxruntime](https://github.com/microsoft/onnxruntime/releases) instalado em sua máquina.  
+> Para conseguir utilizar a API para dev é crucial que o seu clang esteja devidamente configurado em seu dispositivo.  
 > Para alterar as credenciais do wifi e qualquer outra configuração do esp32, crie um arquivo `cfg.toml` com os mesmo campos que em [cfg.toml.example](./embedded/cfg.toml.example)
 
 Após toda a configuração inicial, para rodar tanto o embarcado quando a api há Justfiles.
@@ -230,7 +218,7 @@ Após toda a configuração inicial, para rodar tanto o embarcado quando a api h
 _API_
 
 ```bash
-just app
+just api
 ```
 
 _Embarcado_
