@@ -1,7 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -L./lib/yolo_rs/target/release -lyolo_rs -lpthread -ldl -lm -lstdc++
+#cgo LDFLAGS: -L./lib -lyolo_rs -ldl -lm -lstdc++
 #include "bindings.h"
 */
 import (

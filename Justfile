@@ -10,18 +10,18 @@ esp32cam:
 
 [group("api")]
 [linux]
-app:
+api:
   @(while ! nc -z localhost 8080; do sleep 1; done && xdg-open ./frontend/video.html) &
   @just --justfile ./api/Justfile run
 
 [group("api")]
 [macos]
-app:
+api:
   @(while ! nc -z localhost 8080; do sleep 1; done && open ./frontend/video.html) &
   @just --justfile ./api/Justfile run
 
 [group("api")]
 [windows]
-app:
+api:
   @powershell -Command "while (!(Test-NetConnection -ComputerName localhost -Port 8080).TcpTestSucceeded) { Start-Sleep 1 }; Start-Process 'frontend\\video.html'" &
   @just --justfile ./api/Justfile run

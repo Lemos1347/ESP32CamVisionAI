@@ -4,11 +4,14 @@ default:
 
 compile:
   @cd ./cmd/api/lib/yolo_rs ; cargo build --release
+  @cp ./cmd/api/lib/yolo_rs/target/release/libyolo_rs.a ./cmd/api/lib
   @go build ./cmd/api
 
-run: compile
-  ./api
+run:
+  @docker build -t m11-ponderada2-api -f ./build/Dockerfile.api .
+  @docker run -p 8080:8080 -v ./assets:/assets m11-ponderada2-api
 
 dev:
   @cd ./cmd/api/lib/yolo_rs ; cargo build --release
-  go run ./cmd/api
+  cp ./cmd/api/lib/yolo_rs/target/release/libyolo_rs.a ./cmd/api/lib
+  @go run ./cmd/api

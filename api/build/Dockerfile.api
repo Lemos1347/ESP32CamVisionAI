@@ -1,0 +1,117 @@
+# syntax=docker/dockerfile:1
+
+ARG RUST_VERSION=1.81.0
+
+################################################################################
+# Create a stage for installing pre built onnxruntime.
+FROM ubuntu:22.04 AS onnxruntime-installer
+WORKDIR /build
+
+ENV ONNXRUNTIME_REPO=https://github.com/microsoft/onnxruntime
+ENV ONNXRUNTIME_VERSION=1.19.2
+
+ENV ONNXRUNTIME_VERSION="1.19.2"
+ARG ONNXRUNTIME_ARCHIVE
+ARG TARGETARCH
+
+# Install required tools
+RUN apt-get update && apt-get install -y \
+  curl \
+  tar \
+  && rm -rf /var/lib/apt/lists/*
+
+# Download and extract ONNX Runtime
+RUN if [ "${TARGETARCH}" = "arm64" ]; then export ONNXRUNTIME_ARCHIVE="onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz"; else export ONNXRUNTIME_ARCHIVE="onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz"; fi \ 
+  && curl -L -o /tmp/${ONNXRUNTIME_ARCHIVE} "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/${ONNXRUNTIME_ARCHIVE}" \
+  && mkdir /build/onnxruntime \
+  && tar -xzf /tmp/${ONNXRUNTIME_ARCHIVE} -C /build/onnxruntime --strip-components=1 \
+  && cp /build/onnxruntime/lib/*.so /usr/lib/ \
+  && rm /tmp/${ONNXRUNTIME_ARCHIVE}
+
+################################################################################
+# Create a stage for building the rust library.
+FROM rust:${RUST_VERSION} AS rust-build
+WORKDIR /app
+
+# Install host build dependencies.
+RUN apt-get update && apt-get install -y clang lld musl-dev git
+
+ARG TARGETARCH
+
+# Build the application.
+# Leverage a cache mount to /usr/local/cargo/registry/
+# for downloaded dependencies, a cache mount to /usr/local/cargo/git/db
+# for git repository dependencies, and a cache mount to /app/target/ for
+# compiled dependencies which will speed up subsequent builds.
+# Leverage a bind mount to the src directory to avoid having to copy the
+# source code into the container. Once built, copy the executable to an
+# output directory before the cache mounted /app/target is unmounted.
+RUN --mount=type=bind,source=./cmd/api/lib/yolo_rs/src,target=src \
+  --mount=type=bind,source=./cmd/api/lib/yolo_rs/Cargo.toml,target=Cargo.toml \
+  --mount=type=cache,target=/app/target/ \
+  --mount=type=cache,target=/usr/local/cargo/git/db \
+  --mount=type=cache,target=/usr/local/cargo/registry/ \
+  cargo build --release && \
+  cp target/release/libyolo_rs.a /usr/lib
+
+################################################################################
+# Create a stage for building the application.
+FROM golang:1.22.5-bookworm AS build
+WORKDIR /src
+
+# Install Go dependencies
+RUN apt-get update && apt-get install -y gcc musl-dev libstdc++6 g++
+
+COPY --from=rust-build /usr/lib/libyolo_rs.a /usr/lib/
+COPY --from=onnxruntime-installer /usr/lib/*.so /usr/lib/
+
+# Download dependencies as a separate step to take advantage of Docker's caching.
+# Leverage a cache mount to /go/pkg/mod/ to speed up subsequent builds.
+# Leverage bind mounts to go.sum and go.mod to avoid having to copy them into
+# the container.
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+  --mount=type=bind,source=./go.mod,target=./go.mod \
+  go mod download -x
+
+# This is the architecture you’re building for, which is passed in by the builder.
+# Placing it here allows the previous steps to be cached across architectures.
+ARG TARGETARCH
+
+# Build the application.
+# Leverage a cache mount to /go/pkg/mod/ to speed up subsequent builds.
+# Leverage a bind mount to the current directory to avoid having to copy the
+# source code into the container.
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+  --mount=type=bind,target=. \
+  CGO_ENABLED=1 GOARCH=$TARGETARCH \
+  go build \
+  -ldflags '-extldflags "-L/usr/lib -lonnxruntime -lpthread -latomic -ldl"' \
+  -o /bin/app \
+  /src/cmd/api
+
+################################################################################
+# Create a new stage for running the application that contains the minimal
+# runtime dependencies for the application.
+FROM ubuntu:22.04 AS final
+
+ARG UID=10001
+RUN adduser \
+  --disabled-password \
+  --gecos "" \
+  --no-create-home \
+  --home "/nonexistent" \
+  --shell "/usr/sbin/nologin" \
+  --uid "${UID}" \
+  appuser
+USER appuser
+
+# Copy the executable from the "build" stage.
+COPY --from=build /bin/app /bin/
+COPY --from=onnxruntime-installer /usr/lib/*.so /usr/lib/
+
+# Expose the port that the application listens on.
+EXPOSE 8080
+
+# What the container should run when it is started.
+ENTRYPOINT [ "/bin/app" ]
+
