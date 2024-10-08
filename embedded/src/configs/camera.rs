@@ -286,7 +286,7 @@ impl<'a> Camera<'a> {
             ledc_channel: esp_idf_sys::ledc_channel_t_LEDC_CHANNEL_1,
 
             pixel_format: camera::pixformat_t_PIXFORMAT_JPEG,
-            frame_size: camera::framesize_t_FRAMESIZE_UXGA,
+            frame_size: camera::framesize_t_FRAMESIZE_240X240,
 
             jpeg_quality: 15,
             fb_count: 2,

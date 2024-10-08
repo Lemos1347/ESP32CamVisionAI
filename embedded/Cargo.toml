@@ -1,16 +1,13 @@
 [package]
-name = "esp32cam-rs"
+name = "esp32cam_rs"
 version = "0.1.0"
 authors = ["Lemos1347 <henrique.matias@sou.inteli.edu.br>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
-[lib]
-name = "esp32cam_rs"
-
 [[bin]]
-name = "esp32cam-rs"
+name = "esp32cam_rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]

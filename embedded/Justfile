@@ -4,7 +4,7 @@ default:
 
 compile:
   @cargo build --release
-  espflash flash ./target/xtensa-esp32-espidf/release/esp32cam-rs
+  espflash flash ./target/xtensa-esp32-espidf/release/esp32cam_rs
 
 dev:
   @cargo run

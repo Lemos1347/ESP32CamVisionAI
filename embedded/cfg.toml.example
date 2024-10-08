@@ -1,4 +1,4 @@
-[esp32cam-rs]
+[esp32cam_rs]
 wifi_ssid = "WifiName"
 wifi_psk = "WifiPassword"
 server_url = "http://127.0.0.0:8080"

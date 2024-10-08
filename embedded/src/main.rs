@@ -1,8 +1,10 @@
-// use esp32cam_rs::Camera;
 use esp32cam_rs::{wifi, Camera, Flash, HttpClient, MultiPartForm};
 use esp_idf_hal::{delay::FreeRtos, gpio::*, prelude::*};
 use esp_idf_svc::{eventloop::EspSystemEventLoop, hal::prelude::Peripherals};
 use log::{info, warn};
+use std::collections::VecDeque;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
 
 // Pins used by camera
 // static CAM_PIN_PWDN: i32 = 32;
@@ -34,6 +36,44 @@ pub struct Config {
     use_flash: bool,
     #[default(32)]
     flash_brightness: u8,
+}
+
+fn send_images(buffer: &Arc<(Mutex<VecDeque<Arc<Box<[u8]>>>>, Condvar)>) {
+    info!("Setting up http_client!");
+    let mut http_client = HttpClient::new().expect("Unable to start HttpClient!");
+    info!("Http_client ok!");
+
+    let uri = format!("{}/post", CONFIG.server_url);
+
+    let mut form_data = MultiPartForm::new();
+    let headers = [("Content-type", form_data.content_type)];
+
+    let (lock, cvar) = &**buffer;
+    loop {
+        let mut buffer_guard = lock.lock().unwrap();
+
+        // Wait for images in buffer
+        while buffer_guard.is_empty() {
+            info!("Waiting for images");
+            buffer_guard = cvar.wait(buffer_guard).unwrap();
+        }
+
+        // Take a buffer from queue
+        if let Some(image_data) = buffer_guard.pop_front() {
+            drop(buffer_guard); // Free buffer before sending HTTP request
+
+            form_data.add_file("file", &*image_data);
+
+            match http_client.post(&uri, &headers, &form_data.wrap_up()) {
+                Ok(_) => info!("Image sent successfully!"),
+                Err(err) => {
+                    warn!("Unable to reach server! Err: {}", err.to_string());
+                    FreeRtos::delay_ms(5000);
+                    info!("Trying to reach again!");
+                }
+            };
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -97,28 +137,30 @@ fn main() -> anyhow::Result<()> {
         sysloop,
     )?;
 
-    info!("Setting up http_client!");
-    let mut http_client = HttpClient::new()?;
-    info!("Http_client ok!");
+    let buffer = Arc::new((Mutex::new(VecDeque::new()), Condvar::new()));
 
-    let uri = format!("{}/post", app_config.server_url);
-    let mut form_data = MultiPartForm::new();
-    let headers = [("Content-type", form_data.content_type)];
+    let buffer_cloned = Arc::clone(&buffer);
+    let _send_image_thread = thread::spawn(move || {
+        send_images(&buffer_cloned);
+    });
 
+    let (lock, cvar) = &*buffer;
     loop {
+        let mut buffer_guard = lock.lock().unwrap();
+        if buffer_guard.len() >= 5 {
+            warn!("Buffer is full, waiting for space...");
+            cvar.notify_one(); // Notify another thread to send the photo
+            continue;
+        }
         match cam.get_framebuffer() {
             Some(frame) => {
-                form_data.add_file("file", frame.data());
-                match http_client.post(&uri, &headers, &form_data.wrap_up()) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        warn!("Unable to reach server! Err: {}", err.to_string());
-                        FreeRtos::delay_ms(5000);
-                        info!("Trying to reach again!")
-                    }
-                };
+                buffer_guard.push_back(Arc::new(Box::from(frame.data()))); // Add frame to buffer
+                info!("Image added to buffer. Buffer size: {}", buffer_guard.len());
+                cvar.notify_one();
             }
             None => warn!("Unable to get frame!"),
         };
     }
+
+    // _send_image_thread.join().unwrap();
 }

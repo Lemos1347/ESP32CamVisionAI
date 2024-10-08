@@ -94,17 +94,6 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 # runtime dependencies for the application.
 FROM ubuntu:22.04 AS final
 
-ARG UID=10001
-RUN adduser \
-  --disabled-password \
-  --gecos "" \
-  --no-create-home \
-  --home "/nonexistent" \
-  --shell "/usr/sbin/nologin" \
-  --uid "${UID}" \
-  appuser
-USER appuser
-
 # Copy the executable from the "build" stage.
 COPY --from=build /bin/app /bin/
 COPY --from=onnxruntime-installer /usr/lib/*.so /usr/lib/
@@ -114,4 +103,3 @@ EXPOSE 8080
 
 # What the container should run when it is started.
 ENTRYPOINT [ "/bin/app" ]
-
