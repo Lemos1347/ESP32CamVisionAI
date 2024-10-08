@@ -17,14 +17,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 	"unsafe"
 )
 
 var (
-	model    *C.YOLOv8
-	model_mu sync.Mutex
+	models      []*C.YOLOv8
+	modelsMutex = sync.Mutex{}
+	modelsCond  = sync.NewCond(&modelsMutex)
 )
 
 const bufferSize = 2
@@ -122,13 +124,25 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func(model *C.YOLOv8, model_mu *sync.Mutex, img_buffer *ImageBuffer) {
+	go func(models []*C.YOLOv8, modelsMutex *sync.Mutex, modelsCond *sync.Cond, img_buffer *ImageBuffer) {
+		modelsMutex.Lock()
+
+		for len(models) == 0 {
+			modelsCond.Wait()
+		}
+
+		model := models[len(models)-1]
 		if model == nil {
 			log.Println("Unable to process image, model's pointer is nil")
 			return
 		}
-		model_mu.Lock()
-		defer model_mu.Unlock()
+		// Remove the last available model
+		models = models[:len(models)-1]
+		// Returns the model back on
+		defer func() {
+			models = append(models, model)
+			modelsMutex.Unlock()
+		}()
 
 		cBuffer := (*C.uint8_t)(unsafe.Pointer(&fileBuffer[0]))
 
@@ -144,7 +158,7 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 
 		img_buffer.Add(&file_name)
 
-	}(model, &model_mu, imgBuffer)
+	}(models, &modelsMutex, modelsCond, imgBuffer)
 
 	log.Println("Image received!")
 	w.Header().Set("Content-Type", "application/json")
@@ -186,19 +200,30 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
+	numCPUs := runtime.NumCPU() - 1
+	if numCPUs < 1 {
+		numCPUs = 1
+	}
+
 	model_path := C.CString("./assets/YoloV8n-Face.onnx")
 	saving_dir := C.CString("./assets/results")
 	defer C.free(unsafe.Pointer(model_path))
 	defer C.free(unsafe.Pointer(saving_dir))
 
-	model = C.load_model(model_path, saving_dir)
-	defer C.free_model(model)
-
-	if model == nil {
-		log.Fatalln("Load model returned a nil pointer!")
+	for i := 0; i < numCPUs; i++ {
+		model := C.load_model(model_path, saving_dir)
+		if model == nil {
+			log.Fatalln("Load model returned a nil pointer!")
+		}
+		models = append(models, model)
+		log.Printf("Model %d loaded in Go! %#v\n", i+1, model)
 	}
 
-	log.Printf("Model loaded in Go! %#v\n", model)
+	defer func() {
+		for _, model := range models {
+			C.free_model(model)
+		}
+	}()
 
 	mux := http.NewServeMux()
 
