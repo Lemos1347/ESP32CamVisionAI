@@ -8,7 +8,7 @@ A solução é dividida em duas partes principais: o ESP32-CAM responsável pela
 
 ## Funcionamento
 
-https://github.com/user-attachments/assets/0d62bd79-1d2c-4ff2-a35c-c9f389a0fab8
+https://github.com/user-attachments/assets/40be30ea-2c20-44b1-bed9-8a3f634e3e1f
 
 1. O ESP32-CAM captura imagens em tempo real.
 2. As imagens são enviadas para um servidor remoto para processamento.
