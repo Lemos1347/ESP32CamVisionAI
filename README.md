@@ -216,7 +216,94 @@ A utilização da feature `load-dyn` da crate `ort` exige a linkagem dinâmica p
 - **Necessidade da Crate `ort`**: O uso da feature `load-dyn` torna obrigatória a linkagem dinâmica.
 - **Portabilidade**: A utilização de ambientes controlados, como contêineres, garante a portabilidade mesmo com linkagem dinâmica.
 
-#### 2.5 Resumo do Processo em Nível de Aplicação
+#### 2.6 Paralelização do Processamento com Múltiplas Instâncias do Modelo
+
+##### 2.6.1 Motivação para a Paralelização
+
+Inicialmente, o servidor processava as imagens utilizando uma única instância do modelo de detecção de faces. Isso limitava a capacidade de processamento a um único núcleo da CPU, criando um gargalo no desempenho do sistema, especialmente quando várias imagens eram recebidas em um curto espaço de tempo.
+
+Para melhorar a eficiência e aproveitar os recursos multicore das CPUs modernas, implementamos a paralelização do processamento das imagens através da instânciação de múltiplas instâncias do modelo. Isso permite que o servidor processe várias imagens simultaneamente, distribuindo a carga de trabalho entre os núcleos disponíveis e reduzindo o tempo total de processamento.
+
+##### 2.6.2 Implementação de Múltiplas Instâncias do Modelo
+
+No servidor Go, ao iniciar a aplicação, carregamos múltiplas instâncias do modelo de detecção de faces, correspondendo ao número de núcleos da CPU disponíveis menos um (para reservar um núcleo para o sistema operacional e outras tarefas). Cada instância do modelo é independente e pode ser utilizada por uma thread para processar uma imagem.
+
+**Processo de Inicialização:**
+
+- **Identificação dos Núcleos Disponíveis:**
+  - Utilizamos a função `runtime.NumCPU()` para determinar o número de núcleos disponíveis na máquina.
+  - Subtraímos um desse número para evitar saturar todos os núcleos.
+
+- **Carregamento das Instâncias do Modelo:**
+  - Em um loop, carregamos o modelo várias vezes, criando uma instância separada em memória para cada um.
+  - As instâncias são armazenadas em uma lista compartilhada (`models`), que é protegida por um mutex (`modelsMutex`) para garantir acesso seguro entre threads.
+
+##### 2.6.3 Gerenciamento de Concorrência com Mutex e Condição de Variável
+
+Para coordenar o acesso às instâncias do modelo entre as diferentes threads que processam as imagens, utilizamos mecanismos de sincronização como mutexes e variáveis de condição (condvars).
+
+- **Mutex (`modelsMutex`):** Garante que apenas uma thread por vez acesse ou modifique a lista de modelos disponíveis. Isso previne condições de corrida ao adicionar ou remover instâncias da lista.
+
+- **Variável de Condição (`modelsCond`):** Permite que as threads esperem até que uma instância do modelo esteja disponível. Se uma thread tentar processar uma imagem e não houver modelos disponíveis, ela aguarda na condição de variável até ser notificada de que uma instância foi liberada.
+
+**Fluxo de Processamento:**
+
+1. **Recepção de Imagens:**
+   - Quando uma imagem é recebida via HTTP POST, iniciamos uma goroutine para processá-la, evitando bloquear a recepção de novas imagens.
+
+2. **Acesso ao Modelo:**
+   - A goroutine tenta adquirir o `modelsMutex` para acessar a lista de modelos.
+   - Se não houver instâncias disponíveis (lista vazia), a goroutine espera na `modelsCond` até ser notificada.
+
+3. **Processamento da Imagem:**
+   - Quando uma instância do modelo está disponível, a goroutine a remove da lista e libera o `modelsMutex`.
+   - Processa a imagem utilizando o modelo selecionado.
+   - Após o processamento, adquire o `modelsMutex` novamente, devolve a instância do modelo à lista e notifica as goroutines esperando na `modelsCond` de que uma instância está disponível.
+
+4. **Notificação:**
+   - As goroutines aguardando na `modelsCond` são notificadas sempre que uma instância do modelo é devolvida à lista, permitindo que retomem o processamento.
+
+##### 2.6.4 Benefícios da Abordagem
+
+- **Aumento de Desempenho:**
+  - O processamento paralelo das imagens reduz significativamente o tempo de resposta do sistema.
+  - Melhor aproveitamento dos recursos da CPU, distribuindo a carga entre múltiplos núcleos.
+
+- **Escalabilidade:**
+  - A arquitetura permite ajustar o número de instâncias do modelo de acordo com os recursos disponíveis, facilitando a adaptação a diferentes ambientes de execução.
+
+- **Responsividade:**
+  - O uso de goroutines para o processamento assíncrono das imagens evita que a recepção de novas imagens seja bloqueada, aumentando a capacidade de atendimento do servidor.
+
+##### 2.6.5 Sincronização e Segurança de Dados
+
+O uso combinado de mutexes e variáveis de condição garante que:
+
+- **Acesso Seguro aos Modelos:**
+  - As instâncias do modelo não são acessadas simultaneamente por múltiplas threads, evitando conflitos e possíveis corrupções de dados.
+
+- **Eficiência na Espera:**
+  - As goroutines que aguardam por uma instância do modelo liberada não consomem recursos excessivos, graças ao mecanismo de espera fornecido pelas variáveis de condição.
+
+##### 2.6.6 Considerações sobre o Uso de Recursos
+
+- **Gerenciamento de Memória:**
+  - Cada instância do modelo ocupa memória; é importante balancear o número de instâncias com a capacidade de memória do sistema para evitar sobrecarga.
+
+- **Descarte de Modelos:**
+  - No encerramento da aplicação, as instâncias do modelo são liberadas corretamente para evitar vazamentos de memória.
+
+##### 2.6.7 Integração com o Fluxo de Imagens
+
+A implementação de múltiplas instâncias do modelo é integrada ao fluxo geral de processamento das imagens:
+
+- **Buffer de Imagens:**
+  - As imagens processadas são adicionadas a um buffer que alimenta o stream enviado aos clientes via SSE.
+
+- **Streaming de Imagens:**
+  - O servidor continua a enviar as imagens processadas em tempo real aos clientes conectados, aproveitando o aumento de desempenho proporcionado pela paralelização.
+
+#### 2.7 Resumo do Processo em Nível de Aplicação
 
 1. **Construção da Biblioteca Rust**:
 
