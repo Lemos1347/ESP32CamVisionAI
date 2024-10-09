@@ -33,6 +33,53 @@ Dentro da pasta [emedded](./embedded) está o código utilizado no embarcado, o 
   - [utils](/embedded/src/utils): Funções utilitárias para o embarcado, como a criação de um form-data.
 - [cfg.toml.example](/embedded/cfg.toml.example): Template de arquivo de configuração de variáveis, como wifi ssid e password.
 
+#### 1.1 Uso do FreeRTOS no ESP32-CAM
+
+Está sendo utilizado um sistema operacional em tempo real, FreeRTOS, no ESP32-CAM para gerenciar tarefas e recursos, permitindo a execução concorrente de múltiplas tarefas em um ambiente de microcontrolador. No nosso projeto, aproveitamos as funcionalidades do FreeRTOS de forma indireta, utilizando as abstrações fornecidas pelo Rust e pelas crates específicas para o ESP32.
+
+##### 1.1.1 Execução Paralela: Captura e Envio de Imagens
+
+Implementamos duas threads principais:
+
+1. **Thread de Captura de Imagens**: Responsável por capturar imagens continuamente da câmera.
+2. **Thread de Envio de Imagens**: Responsável por enviar as imagens capturadas ao servidor remoto.
+
+Essa abordagem permite que a captura de imagens não seja bloqueada pelo tempo de envio, garantindo maior eficiência e responsividade do sistema. Ao separar essas tarefas, o microcontrolador pode continuar capturando imagens enquanto outra thread se ocupa do envio, otimizando o uso dos recursos disponíveis.
+
+##### 1.1.2 Sincronização entre Threads
+
+Para coordenar a interação entre as threads, utilizamos as seguintes primitivas de sincronização do Rust:
+
+- **`Arc` (Atomic Reference Counting)**: Permite compartilhamento seguro de dados entre threads.
+- **`Mutex`**: Garante acesso exclusivo ao buffer compartilhado de imagens, prevenindo condições de corrida.
+- **`Condvar` (Condition Variable)**: Permite que uma thread aguarde até que uma condição específica seja atendida, facilitando a comunicação entre threads.
+
+O fluxo de sincronização funciona da seguinte forma:
+
+- **Captura de Imagens**: A thread de captura adiciona imagens ao buffer compartilhado e notifica a thread de envio através da `Condvar`.
+- **Envio de Imagens**: A thread de envio aguarda notificações. Ao ser notificada, verifica se há imagens no buffer, remove a imagem mais antiga e a envia ao servidor.
+- **Coordenação**: O uso de `Mutex` garante que apenas uma thread acesse o buffer por vez, enquanto `Condvar` sincroniza a produção e consumo das imagens.
+
+Essa sincronização assegura que as imagens sejam processadas de forma ordenada e eficiente, evitando perdas ou sobreposições.
+
+##### 1.1.3 Utilização de `std::thread` e Considerações sobre FreeRTOS
+
+Embora o FreeRTOS gerencie as tarefas em nível de sistema, utilizamos a API padrão do Rust, `std::thread`, para criação de threads. Essa escolha traz os seguintes benefícios:
+
+- **Abstração e Simplicidade**: A API do Rust oferece uma interface mais amigável e segura, permitindo que os desenvolvedores foquem na lógica da aplicação sem se preocupar com detalhes do sistema operacional subjacente.
+- **Segurança**: O Rust previne erros comuns em programação concorrente, como condições de corrida e deadlocks, através de seu sistema de tipos e verificações em tempo de compilação.
+- **Compatibilidade**: `std::thread` é suportada no ambiente do ESP32 e mapeia internamente para tarefas do FreeRTOS, garantindo desempenho e eficiência.
+
+A documentação do `esp-idf-hal` reforça essa abordagem:
+
+> **esp-idf-hal/task.rs**: pub unsafe fn create
+>
+> This API is to be used only for niche use cases like where the `std` feature is not enabled, or one absolutely needs to create a raw FreeRTOS task.
+>
+> In all other cases, the standard, safe Rust `std::thread` API should be utilized, as it is anyway a thin wrapper around the FreeRTOS task API.
+
+[Referência: `esp-idf-hal` task.rs](https://github.com/esp-rs/esp-idf-hal/blob/master/src/task.rs)
+
 ### 2. Servidor de Processamento: Detecção de Faces
 
 O servidor é responsável por receber as imagens do ESP32-CAM, processá-las para identificar faces humanas e armazenar as duas imagens mais recentes em um buffer circular.  
