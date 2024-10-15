@@ -51,6 +51,11 @@
             #   '';
             # };
           };
+          packages = {
+            esp = pkgs.callPackage ./nix/packages/esp-package.nix {
+              inherit pkgs;
+            };
+          };
         }
       );
 }

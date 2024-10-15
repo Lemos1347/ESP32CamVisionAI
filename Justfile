@@ -6,7 +6,7 @@ default:
 
 [group("embedded")]
 esp32cam:
-  @just  --justfile ./embedded/Justfile compile
+  @just  --justfile ./embedded/Justfile flash
 
 [group("api")]
 [linux]

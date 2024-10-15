@@ -4,7 +4,14 @@ default:
 
 compile:
   @cargo build --release
-  espflash flash ./target/xtensa-esp32-espidf/release/esp32cam_rs
+
+flash BIN='':
+  @if [ ! "{{BIN}}" = '' ]; then \
+    espflash flash {{BIN}} ; \
+  else \
+    cargo build --release ; \
+    espflash flash ./target/xtensa-esp32-espidf/release/esp32cam_rs ; \
+  fi
 
 dev:
   @cargo run
