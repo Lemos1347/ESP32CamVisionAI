@@ -21,6 +21,7 @@ pkgs.stdenv.mkDerivation {
       openssl
       cacert
       python3
+      go
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ] else [ ]);
 
@@ -37,10 +38,18 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $ESPUP_HOME $RUSTUP_OME $CARGO_HOME $HOME $CARGO_TARGET_DIR
 
     espup install --export-file $ESPUP_HOME/export-esp.sh
+
+    go build -o esp32cam-rs ./flasher/main.go
   '';
 
   installPhase = ''
-    mkdir -p $out/bin
+    mkdir -p $out/bin $out/embedded
+    cp -r . $out/embedded
+
+    export EMBEDDED_DIR=$out/embedded
+    export TOML_FILE_PATH=$out/embedded/cfg.toml
+
+    install -t $out/bin esp32cam-rs
     . $ESPUP_HOME/export-esp.sh
   '';
 
