@@ -34,7 +34,7 @@
               buildInputs =
                 with pkgs;
                 [
-                  rustc
+                  rustup
                   neovim
                   clang
                   libiconv
@@ -54,17 +54,21 @@
 
               # Commands to run when the shell is activated
               shellHook = ''
+
+                export RUSTUP_HOME=$(rustup show | grep 'rustup home' | awk '{print $3}')
+
                 # ESP setup
-                espup install
-                . $HOME/export-esp.sh
+                test -f $RUSTUP_HOME/export-esp.sh || (espup install && mv $HOME/export-esp.sh $RUSTUP_HOME/)
 
-                # Copy the config file
-                cp ./embedded/cfg.toml.example ./embedded/cfg.toml
+                  . $RUSTUP_HOME/export-esp.sh
 
-                echo "Development environment ready!"
-                echo "Please update file ./embedded/cfg.toml with your wifi credentials"
-                echo "After that, just run:"
-                echo "just esp32cam"
+                  # Generate config file if it not exists
+                  test ./embedded/cfg.toml || cp ./embedded/cfg.toml.example ./embedded/cfg.toml
+
+                  echo "Development environment ready!"
+                  echo "Please update file ./embedded/cfg.toml with your wifi credentials"
+                  echo "After that, just run:"
+                  echo "just esp32cam"
               '';
             };
 
